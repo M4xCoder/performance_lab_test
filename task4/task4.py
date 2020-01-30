@@ -32,7 +32,7 @@ list_data_minute = list(zip(list_start_minute, list_end_minute))
 
 spisok = []
 amount = 0
-for i in range(480):
+for i in range(720):
     for poset in list_data_minute:
         if poset[0] <= i < poset[1]:
             amount += 1
