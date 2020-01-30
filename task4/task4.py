@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 
 from sys import argv
+from collections import defaultdict
+from itertools import groupby, tee
+import datetime
 
 if len(argv) <= 1:
     print('No input file, one data files are required')
@@ -16,46 +19,67 @@ list_start = [i[0].split(':') for i in list_data]
 list_end = [i[1].split(':') for i in list_data]
 
 
-def trans_seconds(list):
+def trans_minutes(list):
     s = []
     for i in list:
         s.append((int(i[0]) - 8) * 60 + int(i[1]))
     return s
 
 
-list_start_sek = trans_seconds(list_start)
-list_end_sek = trans_seconds(list_end)
+list_start_minute = trans_minutes(list_start)
+list_end_minute = trans_minutes(list_end)
+list_data_minute = list(zip(list_start_minute, list_end_minute))
 
-print(list_data)
-print(list_start_sek)
-print(list_end_sek)
+spisok = []
+amount = 0
+for i in range(480):
+    for poset in list_data_minute:
+        if poset[0] <= i < poset[1]:
+            amount += 1
+    spisok.append(amount)
+    amount = 0
 
-def has_overlap(A_start, A_end, B_start, B_end):
-    latest_start = max(A_start, B_start)
-    earliest_end = min(A_end, B_end)
-    return (latest_start, earliest_end)
 
-z = list(zip(list_start_sek, list_end_sek))
+def list_duplicates(seq):
+    tally = defaultdict(list)
+    for i, item in enumerate(seq):
+        tally[item].append(i)
+    return ((key, locs) for key, locs in tally.items()
+            if len(locs) > 1)
 
-for i in range(len(z)):
-    for f in range(len(z)):
-        print(has_overlap(z[i][0], z[i][1], z[f][0], z[f][1]))
 
-'''
-noOverlapList = []
-start = list_start_sek[0]
-end = list_end_sek[0]
+def pairwise(iterable):
+    a, b = tee(iterable)
+    next(b, None)
+    return zip(a, b)
 
-for interval in zip(list_start_sek, list_end_sek):
-    # if interval overlaps with tempInterval
-    if interval[0] < end and interval[1] > end:
-        end = interval[1]
-    else:
-        if interval[0] > end:
-            noOverlapList.append((start, end))  # merged non overlapping interval
-            start = interval[0]
-            end = interval[1]
 
-print(noOverlapList)
-# a.start <= b.end AND a.end >= b.start
-'''
+def grouper_periods(lst):
+    result = []
+    for k, g in groupby(pairwise(lst), key=lambda x: x[1] - x[0]):
+        g = list(g)
+        if len(g) > 1:
+            try:
+                if g[0][0] == result[-1]:
+                    del result[-1]
+                elif g[0][0] == result[-1][1]:
+                    g = g[1:]  # patch for duplicate start and/or end
+            except (IndexError, TypeError):
+                pass
+            result.append((g[0][0], g[-1][-1], k))
+        else:
+            result.append(g[0][-1]) if result else result.append(g[0])
+    return result
+
+
+periods = grouper_periods(max(list(list_duplicates(spisok)))[1])
+
+
+def convert(n):
+    return str(datetime.timedelta(minutes=n) + datetime.timedelta(hours=8))
+
+
+for i in periods:
+    start = convert(i[0])
+    end = convert(i[1] + i[2])
+    print(start[:-3], end[:-3])
